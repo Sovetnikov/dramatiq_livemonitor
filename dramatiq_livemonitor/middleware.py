@@ -85,7 +85,7 @@ class LiveMonitorMiddleware(Middleware):
         _, actor, message_id, host_pid, tid = lock_id.split(':')
         hostname, pid = host_pid.split('PID')
         tid = tid.replace('TID', '')
-        return dict(actor=actor, message_id=message_id, hostname=hostname, pid=int(pid), thread_id=int(tid))
+        return dict(actor=actor, message_id=message_id, worker_id=host_pid, hostname=hostname, pid=int(pid), thread_id=int(tid))
 
     def get_worker_lock_id(self):
         return f'{self.worker_lock_prefix}:{self.worker_id}:TC{self.worker.worker_threads}:{self.worker_queues}'
@@ -96,4 +96,4 @@ class LiveMonitorMiddleware(Middleware):
         hostname, pid = host_pid.split('PID')
         worker_threads = tc.replace('TC', '')
         queues = queues.split('!')
-        return dict(hostname=hostname, pid=int(pid), worker_threads=int(worker_threads), queues=queues)
+        return dict(hostname=hostname, pid=int(pid), worker_id=host_pid, worker_threads=int(worker_threads), queues=queues)
