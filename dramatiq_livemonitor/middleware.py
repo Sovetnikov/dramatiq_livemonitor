@@ -8,6 +8,9 @@ from livelock.client import LiveNBLock
 
 logger = logging.getLogger(__name__)
 
+def thread_id():
+    return str(os.getpid()) + str(threading.get_ident())
+
 try:
     from sentry_sdk import capture_message, capture_exception
 except ImportError:
@@ -26,14 +29,14 @@ class LiveMonitorMiddleware(Middleware):
 
     # Middleware object created for every worker process and shared between all threads
     def __init__(self):
-        logger.debug('__init__ (PID %s thread %s)', os.getpid(), threading.get_ident())
+        logger.debug('__init__ (PID %s thread %s)', os.getpid(), thread_id())
         self.worker = None
         self.worker_lock = None
         self.storage = threading.local()
 
     def after_worker_boot(self, broker, worker):
         # Called in worker process main thread
-        logger.debug('after_worker_boot (PID %s thread %s)', os.getpid(), threading.get_ident())
+        logger.debug('after_worker_boot (PID %s thread %s)', os.getpid(), thread_id())
         self.worker = worker
 
         pid = os.getpid()
@@ -46,20 +49,20 @@ class LiveMonitorMiddleware(Middleware):
             capture_message('not self.worker_lock.acquire()')
 
     def after_worker_shutdown(self, broker, worker):
-        logger.debug('after_worker_shutdown (PID %s thread %s)', os.getpid(), threading.get_ident())
+        logger.debug('after_worker_shutdown (PID %s thread %s)', os.getpid(), thread_id())
         if worker != self.worker:
             raise Exception('worker != self.worker')
         if self.worker_lock is not None:
             self.worker_lock.release()
 
     def before_worker_thread_shutdown(self, broker, thread):
-        logger.debug('before_worker_thread_shutdown (PID %s thread %s)', os.getpid(), threading.get_ident())
+        logger.debug('before_worker_thread_shutdown (PID %s thread %s)', os.getpid(), thread_id())
         if hasattr(self.storage, 'actor_lock') and self.storage.actor_lock:
             self.storage.actor_lock.release()
             self.storage.actor_lock = None
 
     def after_process_message(self, broker, message, *, result=None, exception=None):
-        logger.debug('after_process_message (PID %s thread %s)', os.getpid(), threading.get_ident())
+        logger.debug('after_process_message (PID %s thread %s)', os.getpid(), thread_id())
 
         # if message skipped then self.storage.actor_lock may be not defined
         # if self.storage.actor_lock is not None:
@@ -83,7 +86,7 @@ class LiveMonitorMiddleware(Middleware):
 
     def before_process_message(self, broker, message):
         # Called from worker process, separate worker thread (not main thread)
-        logger.debug('before_process_message (PID %s thread %s)', os.getpid(), threading.get_ident())
+        logger.debug('before_process_message (PID %s thread %s)', os.getpid(), thread_id())
         if hasattr(self.storage, 'actor_lock') and self.storage.actor_lock is not None:
             capture_message('self.storage.actor_lock is not None in before_process_message')
         lock_id = self.get_message_lock_id(message)
@@ -94,7 +97,7 @@ class LiveMonitorMiddleware(Middleware):
     def get_message_lock_id(self, message):
         actor = message.actor_name
         message_id = message.message_id
-        return f'{self.actor_lock_prefix}:{actor}:{message_id}:{self.worker_id}:TID{threading.get_ident()}'
+        return f'{self.actor_lock_prefix}:{actor}:{message_id}:{self.worker_id}:TID{thread_id()}'
 
     @classmethod
     def decode_message_lock_id(cls, lock_id):
