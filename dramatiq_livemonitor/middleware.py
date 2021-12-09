@@ -34,9 +34,11 @@ class LiveMonitorMiddleware(Middleware):
         self.worker_lock = None
         self.storage = threading.local()
 
-    def after_worker_boot(self, broker, worker):
+    def before_worker_boot(self, broker, worker):
+        # before worker boot choiced becaus messages can be processed before after_worker_boot call
         # Called in worker process main thread
         logger.debug('after_worker_boot (PID %s thread %s)', os.getpid(), thread_id())
+        # Saving worker only for debug purposes
         self.worker = worker
 
         pid = os.getpid()
