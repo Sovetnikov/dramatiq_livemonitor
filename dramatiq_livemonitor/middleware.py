@@ -93,8 +93,15 @@ class LiveMonitorMiddleware(Middleware):
             capture_message('self.storage.actor_lock is not None in before_process_message')
         lock_id = self.get_message_lock_id(message)
         self.storage.actor_lock = LiveNBLock(lock_id)
-        if not self.storage.actor_lock.acquire():
-            capture_message('not self.storage.actor_lock.acquire()')
+        try:
+            if not self.storage.actor_lock.acquire():
+                capture_message('not self.storage.actor_lock.acquire()')
+        except Exception as e:
+            # Lock acquire state is undefined, better to close livelock connection
+            if self.storage.actor_lock._connection:
+                self.storage.actor_lock._connection._close()
+            self.storage.actor_lock = None
+            raise
 
     def get_message_lock_id(self, message):
         actor = message.actor_name
